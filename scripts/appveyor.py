@@ -71,16 +71,10 @@ def setup_env():
             os.path.join(vc_dir(), r"bin\amd64\vcvars64.bat")
         ):
             logger.info("Fixing VS2010 Express and 64bit builds")
-            with urlopen(
-                "https://raw.githubusercontent.com/psycopg/psycopg2/"
-                "master/scripts/vcvars64-vs2010.bat"
-            ) as f:
-                data = f.read()
-
-            with open(
-                os.path.join(vc_dir(), r"bin\amd64\vcvars64.bat"), 'w'
-            ) as f:
-                f.write(data)
+            shutil.copy(
+                os.path.join(clone_dir(), r"scripts\vcvars64-vs2010.bat"),
+                os.path.join(vc_dir(), r"bin\amd64\vcvars64.bat"),
+            )
 
     logger.info("Configuring compiler")
     bat_call(
@@ -100,7 +94,7 @@ def python_info():
     )
 
 
-def step_init():
+def step_install():
     python_info()
 
     # The program rc.exe on 64bit with some versions look in the wrong path
@@ -122,12 +116,9 @@ def step_init():
         print("max_prepared_transactions = 10", file=f)
 
 
-def step_install():
+def step_build_script():
     build_openssl()
     build_libpq()
-
-
-def step_build_script():
     build_psycopg()
 
 
@@ -285,7 +276,7 @@ $config->{openssl} = "%s";
 
 
 def build_psycopg():
-    os.chdir(r"C:\Project")
+    os.chdir(clone_dir())
 
     # Find the pg_config just built
     path = os.pathsep.join(
@@ -470,6 +461,10 @@ def vs_ver(pyver=None):
         raise Exception('unexpected python version: %r' % pyver)
 
     return vsver
+
+
+def clone_dir():
+    return r"C:\Project"
 
 
 def pg_dir():
