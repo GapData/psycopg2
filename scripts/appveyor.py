@@ -174,7 +174,7 @@ def step_build_script():
 
 
 def build_openssl():
-    top = base_dir() / 'openssl'
+    top = ssl_build_dir()
     if (top / 'lib' / 'libssl.lib').exists():
         return
 
@@ -197,7 +197,7 @@ def build_openssl():
 
     # Download OpenSSL source
     zipname = f'OpenSSL_{ver}.zip'
-    zipfile = top_dir() / zipname
+    zipfile = cache_dir() / zipname
     if not zipfile.exists():
         download(
             f"https://github.com/openssl/openssl/archive/{zipname}", zipfile
@@ -206,7 +206,8 @@ def build_openssl():
     with ZipFile(zipfile) as z:
         z.extractall(path=build_dir())
 
-    os.chdir(build_dir() / f"openssl-OpenSSL_{ver}")
+    sslbuild = build_dir() / f"openssl-OpenSSL_{ver}"
+    os.chdir(sslbuild)
     run_command(
         ['perl', 'Configure', target, 'no-asm']
         + ['no-shared', 'no-zlib', f'--prefix={top}', f'--openssldir={top}']
@@ -216,12 +217,12 @@ def build_openssl():
 
     assert (top / 'lib' / 'libssl.lib').exists()
 
-    os.chdir(base_dir())
-    shutil.rmtree(build_dir() / f"openssl-OpenSSL_{ver}")
+    os.chdir(clone_dir())
+    shutil.rmtree(sslbuild)
 
 
 def build_libpq():
-    top = base_dir() / 'postgresql'
+    top = pg_build_dir()
     if (top / 'lib' / 'libpq.lib').exists():
         return
 
@@ -236,7 +237,7 @@ def build_libpq():
 
     # Download PostgreSQL source
     zipname = f'postgres-REL_{ver}.zip'
-    zipfile = top_dir() / zipname
+    zipfile = cache_dir() / zipname
     if not zipfile.exists():
         download(
             f"https://github.com/postgres/postgres/archive/REL_{ver}.zip",
@@ -273,7 +274,7 @@ $config->{openssl} = "%s";
 
 1;
 """
-            % str(base_dir() / 'openssl').replace('\\', '\\\\'),
+            % str(ssl_build_dir()).replace('\\', '\\\\'),
             file=f,
         )
 
@@ -316,7 +317,7 @@ $config->{openssl} = "%s";
     assert (top / 'lib' / 'libpq.lib').exists()
     assert (top / 'bin' / 'pg_config.exe').exists()
 
-    os.chdir(base_dir())
+    os.chdir(clone_dir())
     shutil.rmtree(pgbuild)
 
 
@@ -327,8 +328,8 @@ def build_psycopg():
     run_command(
         [py_exe(), "setup.py", "build_ext", "--have-ssl"]
         + ["-l", "libpgcommon", "-l", "libpgport"]
-        + ["-L", base_dir() / r'openssl\lib']
-        + ['-I', base_dir() / r'openssl\include']
+        + ["-L", ssl_build_dir() / 'lib']
+        + ['-I', ssl_build_dir() / 'include']
     )
     run_command([py_exe(), "setup.py", "build_py"])
 
@@ -394,7 +395,7 @@ def install_binary_package():
 
 def add_pg_config_path():
     """Allow finding in the path the pg_config just built."""
-    pg_path = str(base_dir() / r'postgresql\bin')
+    pg_path = str(pg_build_dir() / 'bin')
     if pg_path not in os.environ['PATH'].split(os.pathsep):
         setenv('PATH', os.pathsep.join([pg_path, os.environ['PATH']]))
 
@@ -666,29 +667,37 @@ def clone_dir():
     return Path(r"C:\Project")
 
 
-def pg_dir():
+def appveyor_pg_dir():
     return Path(os.environ['POSTGRES_DIR'])
 
 
 def pg_data_dir():
-    return pg_dir() / 'data'
+    return appveyor_pg_dir() / 'data'
 
 
 def pg_bin_dir():
-    return pg_dir() / 'bin'
+    return appveyor_pg_dir() / 'bin'
 
 
-def top_dir():
-    return Path(r"C:\Others")
+def pg_build_dir():
+    return cache_arch_dir() / 'postgresql'
 
 
-def base_dir():
-    rv = top_dir() / opt.pyarch / vs_ver()
+def ssl_build_dir():
+    return cache_arch_dir() / 'openssl'
+
+
+def cache_arch_dir():
+    rv = cache_dir() / opt.pyarch / vs_ver()
     return ensure_dir(rv)
 
 
+def cache_dir():
+    return Path(r"C:\Others")
+
+
 def build_dir():
-    rv = base_dir() / 'Builds'
+    rv = cache_arch_dir() / 'Builds'
     return ensure_dir(rv)
 
 
